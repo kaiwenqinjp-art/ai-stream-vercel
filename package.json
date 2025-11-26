@@ -1,0 +1,13 @@
+{
+  "name": "ai-stream-demo",
+  "version": "1.0.0",
+  "description": "AI Stream Demo on Vercel",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vercel": "^33.0.0"
+  }
+}
