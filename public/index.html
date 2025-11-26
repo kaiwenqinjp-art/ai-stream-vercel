@@ -1,331 +1,41 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Stream Handler Demo</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        .container {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 800px;
-            width: 100%;
-            padding: 40px;
-        }
-        h1 { color: #333; margin-bottom: 10px; }
-        .subtitle { color: #666; margin-bottom: 20px; font-size: 14px; }
-        .config-section {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            border-left: 4px solid #667eea;
-        }
-        .config-label { 
-            color: #333; 
-            font-weight: 600; 
-            font-size: 12px;
-            margin-bottom: 8px;
-            display: block;
-        }
-        input[type="text"] {
-            width: 100%;
-            padding: 8px 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 6px;
-            font-size: 13px;
-            font-family: monospace;
-        }
-        input[type="text"]:focus { outline: none; border-color: #667eea; }
-        textarea {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 6px;
-            font-size: 14px;
-            min-height: 80px;
-            resize: vertical;
-        }
-        textarea:focus { outline: none; border-color: #667eea; }
-        .button-group {
-            display: flex;
-            gap: 10px;
-            margin: 20px 0 30px 0;
-        }
-        button {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            flex: 1;
-        }
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn-secondary {
-            background: #f0f0f0;
-            color: #333;
-            flex: 0;
-        }
-        .btn-secondary:hover { background: #e0e0e0; }
-        .output-label {
-            color: #333;
-            font-weight: 600;
-            margin-bottom: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .status-loading { background: #fff3cd; color: #856404; }
-        .status-success { background: #d4edda; color: #155724; }
-        .status-error { background: #f8d7da; color: #721c24; }
-        #output {
-            background: #f8f9fa;
-            border: 2px solid #e0e0e0;
-            border-radius: 6px;
-            padding: 20px;
-            color: #333;
-            line-height: 1.6;
-            min-height: 100px;
-            max-height: 400px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-        .stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 15px;
-            margin-top: 20px;
-        }
-        .stat-item {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 6px;
-            border-left: 4px solid #667eea;
-        }
-        .stat-label { color: #666; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
-        .stat-value { color: #333; font-size: 20px; font-weight: 700; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🚀 AI Stream Handler Demo</h1>
-        <p class="subtitle">Chunked Transfer Encoding Streaming</p>
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+let buffer = '';
 
-        <div class="config-section">
-            <label class="config-label" for="apiUrl">Backend API URL:</label>
-            <input type="text" id="apiUrl" value="/api/stream" />
-        </div>
+while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
 
-        <form id="streamForm">
-            <label for="prompt">Enter your prompt:</label>
-            <textarea id="prompt" placeholder="Try: 'hello', 'python', 'javascript', or 'stream'..." required></textarea>
+    buffer += decoder.decode(value, { stream: true });
 
-            <div class="button-group">
-                <button type="submit" class="btn-primary" id="submitBtn">Start Stream</button>
-                <button type="button" class="btn-secondary" id="clearBtn">Clear</button>
-                <button type="button" class="btn-secondary" id="copyBtn">Copy</button>
-            </div>
-        </form>
+    // Process all full SSE events
+    let parts = buffer.split('\n\n');
 
-        <div class="output-label">
-            <span>Stream Output</span>
-            <span class="status-badge" id="statusBadge">Ready</span>
-        </div>
-        <div id="output"></div>
+    // Leave incomplete chunk for next loop
+    buffer = parts.pop();
 
-        <div class="stats">
-            <div class="stat-item">
-                <div class="stat-label">Characters</div>
-                <div class="stat-value" id="charCount">0</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-label">Time (sec)</div>
-                <div class="stat-value" id="timeElapsed">0s</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-label">Speed (chars/sec)</div>
-                <div class="stat-value" id="speed">0</div>
-            </div>
-        </div>
-    </div>
+    for (const part of parts) {
+        if (!part.trim().startsWith('data:')) continue;
 
-    <script>
-        class AIStreamHandler {
-            constructor() {
-                this.output = document.getElementById('output');
-                this.statusBadge = document.getElementById('statusBadge');
-                this.charCount = document.getElementById('charCount');
-                this.timeElapsed = document.getElementById('timeElapsed');
-                this.speed = document.getElementById('speed');
-                this.submitBtn = document.getElementById('submitBtn');
-                this.form = document.getElementById('streamForm');
-                this.apiUrlInput = document.getElementById('apiUrl');
-                
-                this.charNum = 0;
-                this.startTime = null;
-                this.timerInterval = null;
-                
-                this.loadConfig();
-                this.attachListeners();
-            }
-
-            loadConfig() {
-                const saved = localStorage.getItem('apiUrl');
-                if (saved) this.apiUrlInput.value = saved;
-            }
-
-            attachListeners() {
-                this.form.addEventListener('submit', (e) => this.handleSubmit(e));
-                document.getElementById('clearBtn').addEventListener('click', () => this.clearOutput());
-                document.getElementById('copyBtn').addEventListener('click', () => this.copyToClipboard());
-                this.apiUrlInput.addEventListener('change', () => {
-                    localStorage.setItem('apiUrl', this.apiUrlInput.value);
-                });
-            }
-
-            setStatus(text, type = 'loading') {
-                this.statusBadge.textContent = text;
-                this.statusBadge.className = `status-badge status-${type}`;
-            }
-
-            startTimer() {
-                this.startTime = Date.now();
-                this.timerInterval = setInterval(() => {
-                    const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
-                    this.timeElapsed.textContent = `${elapsed}s`;
-                    if (elapsed > 0) {
-                        this.speed.textContent = Math.round(this.charNum / elapsed);
-                    }
-                }, 100);
-            }
-
-            stopTimer() {
-                if (this.timerInterval) {
-                    clearInterval(this.timerInterval);
-                }
-            }
-
-            clearOutput() {
-                this.output.textContent = '';
-                this.charNum = 0;
-                this.charCount.textContent = '0';
-                this.timeElapsed.textContent = '0s';
-                this.speed.textContent = '0';
-                this.setStatus('Ready', 'success');
-            }
-
-            async copyToClipboard() {
-                try {
-                    await navigator.clipboard.writeText(this.output.textContent);
-                    const btn = document.getElementById('copyBtn');
-                    btn.textContent = '✓ Copied!';
-                    setTimeout(() => btn.textContent = 'Copy', 2000);
-                } catch (err) {
-                    alert('Failed to copy');
-                }
-            }
-
-            async handleSubmit(e) {
-                e.preventDefault();
-                const prompt = document.getElementById('prompt').value.trim();
-                const apiUrl = this.apiUrlInput.value.trim();
-
-                if (!prompt || !apiUrl) {
-                    alert('Please enter prompt and API URL');
-                    return;
-                }
-
-                this.clearOutput();
-                this.setStatus('Connecting...', 'loading');
-                this.submitBtn.disabled = true;
-                this.startTimer();
-
-                try {
-                    await this.streamData(prompt, apiUrl);
-                    this.setStatus('Complete ✓', 'success');
-                } catch (error) {
-                    console.error('Error:', error);
-                    this.setStatus('Error ✗', 'error');
-                    this.output.textContent = `Error: ${error.message}`;
-                } finally {
-                    this.submitBtn.disabled = false;
-                    this.stopTimer();
-                }
-            }
-
-            async streamData(prompt, apiUrl) {
-                console.log('🚀 Fetching:', apiUrl);
-                console.log('📝 Prompt:', prompt);
-                
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt })
-                });
-
-                console.log('✅ Response:', response.status);
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                if (!response.body) {
-                    throw new Error('No response body');
-                }
-
-                this.setStatus('Streaming...', 'loading');
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    
-                    if (done) {
-                        console.log('✅ Stream complete');
-                        break;
-                    }
-
-                    const text = decoder.decode(value, { stream: true });
-                    console.log('📦 Received:', text.length, 'chars');
-                    
-                    this.output.textContent += text;
-                    this.charNum += text.length;
-                    this.charCount.textContent = this.charNum;
-                    this.output.scrollTop = this.output.scrollHeight;
-                }
-            }
+        const jsonStr = part.trim().replace(/^data:\s*/, '');
+        
+        let payload;
+        try {
+            payload = JSON.parse(jsonStr);
+        } catch (e) {
+            continue; // ignore incomplete JSON
         }
 
-        new AIStreamHandler();
-    </script>
-</body>
-</html>
+        if (payload.chunk) {
+            this.output.textContent += payload.chunk;
+            this.charNum += payload.chunk.length;
+            this.charCount.textContent = this.charNum;
+            this.output.scrollTop = this.output.scrollHeight;
+        }
+
+        if (payload.done) {
+            console.log("Stream finished.");
+            return;
+        }
+    }
+}
